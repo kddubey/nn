@@ -4,8 +4,8 @@ import numpy as np
 
 
 class Tensor:
-    def __init__(self, data: float):
-        self._data = data
+    def __init__(self, data: list[float]):
+        self._data: np.ndarray = np.array(data)
         self._inputs: set[Tensor] = set()  # tensors which this tensor is a function of
         self._backward = lambda: None  # backward pass function
         self.grad = (
@@ -63,6 +63,21 @@ class Tensor:
 
     def __mul__(self, other: Tensor) -> Tensor:
         data = self._data * other._data
+        out = Tensor(data)
+        out._inputs = {self, other}
+
+        self_grad = other._data
+        other_grad = self._data
+
+        def backward():
+            self.grad += out.grad * self_grad
+            other.grad += out.grad * other_grad
+
+        out._backward = backward
+        return out
+
+    def dot(self, other: Tensor) -> Tensor:
+        data = self._data.T @ other._data
         out = Tensor(data)
         out._inputs = {self, other}
 
