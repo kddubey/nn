@@ -9,21 +9,30 @@ from nn import Tensor
 
 
 def test_backward():
-    # some graph
+    # computational graph:
+    #        da_root
+    #           |
+    #           +
+    #          / \
+    #         a   b
+    #         |   |
+    #         *   *
+    #        / \ / \
+    #       c   d   e
     c = Tensor([2])
     d = Tensor([3])
     e = Tensor([4])
     a = c * d
     b = d * e
-    logit = a + b
-    logit.backward()
+    da_root = a + b
+    da_root.backward()
 
     assert np.all(c.grad == d._data)
     assert np.all(d.grad == (a.grad * c._data) + (b.grad * e._data))
     assert np.all(e.grad == d._data)
     assert np.all(a.grad == 1)
     assert np.all(b.grad == 1)
-    assert np.all(logit.grad == 1)
+    assert np.all(da_root.grad == 1)
 
     # logistic regression
     w = Tensor([0, 1])
