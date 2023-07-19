@@ -3,6 +3,40 @@ from __future__ import annotations
 import numpy as np
 
 
+def _reverse_topo_order(tensor: Tensor) -> list[Tensor]:
+    """
+    Order all reachable Tensors from `tensor` such that a Tensor's parent always comes
+    before itself. This criterion is necessary for the chain rule.
+
+    Parameters
+    ----------
+    tensor : Tensor
+        the tensor whose partial derivatives need to be computed
+
+    Returns
+    -------
+    list[Tensor]
+        reverse-topological order of all reachable Tensors from `tensor`
+    """
+    # strategy: regular topological order, and then reverse
+    nodes_ordered: list[Tensor] = []
+    _visited: set[Tensor] = set()
+
+    def dfs(node: Tensor):
+        _visited.add(node)
+        # regular topological order invariant: a node's children must be appended before
+        # appending itself
+        for child in node._inputs:
+            if child not in _visited:
+                dfs(child)
+        nodes_ordered.append(node)
+
+    dfs(tensor)  # nodes_ordered is leaves -> root
+    nodes_ordered.reverse()
+
+    return nodes_ordered
+
+
 class Tensor:
     def __init__(self, data: list[float]):
         self._data: np.ndarray = np.array(data)
@@ -21,20 +55,7 @@ class Tensor:
         # wrt some node if we know the "local gradient" and the gradient of the root wrt
         # the node's parent (we multiply the two). so we need to calculate gradients
         # from parents -> children or root -> leaves.
-        # it's easy to implement it as dfs to get leaves -> root, and then reverse
-        nodes_ordered: list[Tensor] = []
-        _visited: set[Tensor] = set()
-
-        def dfs(node: Tensor):
-            _visited.add(node)
-            # invariant: a node's children must be appended before appending its parent
-            for child in node._inputs:
-                if child not in _visited:
-                    dfs(child)
-            nodes_ordered.append(node)
-
-        dfs(self)
-        nodes_ordered.reverse()  # now they're root -> leaves
+        nodes_ordered = _reverse_topo_order(self)
 
         nodes_ordered[0].grad = 1  # derivative root wrt root. it was initialized to 0
         for node in nodes_ordered:
