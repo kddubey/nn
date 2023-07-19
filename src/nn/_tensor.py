@@ -26,10 +26,10 @@ class Tensor:
         _visited: set[Tensor] = set()
 
         def dfs(node: Tensor):
+            _visited.add(node)
             # invariant: a node's children must be appended before appending its parent
             for child in node._inputs:
                 if child not in _visited:
-                    _visited.add(child)
                     dfs(child)
             nodes_ordered.append(node)
 
