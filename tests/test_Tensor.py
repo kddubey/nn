@@ -40,3 +40,10 @@ def test_backward():
     logit = w.dot(x)
     logit.backward()
     assert np.all(w.grad == x._data)
+
+
+def test___repr__():
+    assert repr(Tensor([0]))
+    assert repr(Tensor([0, 0]))
+    assert repr(Tensor([[0, 0], [0, 0], [0, 0]]))
+    assert repr(Tensor([[[0, 0], [0, 0]]]))
