@@ -36,26 +36,12 @@ class Tensor:
     def shape(self):
         return self._data.shape
 
-    def __repr__(self) -> str:
-        # return the numpy array's repr but replace "array" with "Tensor" adjusting
-        # whitespace for the difference in the length of the names
-        numpy_name = "array"
-        class_name = self.__class__.__name__
-        array_strings = (
-            repr(self._data)
-            .removeprefix(f"{numpy_name}(")
-            .removesuffix(")")
-            .split("\n")
-        )
-        whitespace = " " * (len(class_name) - len(numpy_name))  # assume positive
-        data_repr = (
-            array_strings[0]
-            + "\n"
-            + "\n".join(whitespace + array_string for array_string in array_strings[1:])
-        )
-        if len(self.shape) == 1:  # it's a 1-D array
-            data_repr = data_repr.rstrip("\n")
-        return f"{class_name}({data_repr})"
+    @property
+    def T(self):
+        if self._inputs:
+            raise ValueError("Narrrgo!")
+        self._data = self._data.T
+        return self
 
     def backward(self):
         # reverse-topological order, i.e., root -> leaves.
@@ -174,3 +160,24 @@ class Tensor:
 
         out._backward = backward
         return out
+
+    def __repr__(self) -> str:
+        # return the numpy array's repr but replace "array" with "Tensor", adjusting
+        # whitespace for the difference in the length of the names
+        numpy_name = "array"
+        class_name = self.__class__.__name__
+        array_strings = (
+            repr(self._data)
+            .removeprefix(f"{numpy_name}(")
+            .removesuffix(")")
+            .split("\n")
+        )
+        whitespace = " " * (len(class_name) - len(numpy_name))  # assume positive
+        data_repr = (
+            array_strings[0]
+            + "\n"
+            + "\n".join(whitespace + array_string for array_string in array_strings[1:])
+        )
+        if len(self.shape) == 1:  # it's a 1-D array
+            data_repr = data_repr.rstrip("\n")
+        return f"{class_name}({data_repr})"
