@@ -12,7 +12,7 @@ from nn import Tensor
 
 @pytest.fixture(scope="module")
 def atol() -> float:
-    return 1e-06
+    return 1e-07
 
 
 def test_backward_single_variable():
@@ -42,31 +42,31 @@ def test_backward_single_variable():
     assert np.all(da_root.grad == 1)
 
 
-def test_backward_multi_variable():
+def test_backward_multi_variable(atol):
     # expected gradients from torch.Tensor
     X = torch.tensor([[0.0, 1.0], [2.0, 3.0], [4.0, 5.0]], requires_grad=True)
     Y = torch.tensor([[6.0, 7.0], [8.0, 9.0], [10.0, 11.0]], requires_grad=True)
     W = torch.tensor([[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]], requires_grad=True)
-    Z = (X + Y) * W
+    Z = (2 * X - Y) * W / 3
     Z.sum().backward()
 
-    # observed gradients from nn.Tensor
+    # gradients from nn.Tensor
     X_ = Tensor(X.detach().numpy())
     Y_ = Tensor(Y.detach().numpy())
     W_ = Tensor(W.detach().numpy())
-    Z_ = (X_ + Y_) * W_
+    Z_ = (2 * X_ - Y_) * W_ / 3
     Z_.backward()
 
-    assert np.all(X.grad.numpy() == X_.grad)
-    assert np.all(Y.grad.numpy() == Y_.grad)
-    assert np.all(W.grad.numpy() == W_.grad)
+    assert np.allclose(X.grad.numpy(), X_.grad, atol=atol)
+    assert np.allclose(Y.grad.numpy(), Y_.grad, atol=atol)
+    assert np.allclose(W.grad.numpy(), W_.grad, atol=atol)
 
 
 def test_backward_nn(atol):
     # 1-hidden-layer binary classification. computational graph:
     #         loss
     #           |
-    #          NLL
+    #          MSE
     #          / \
     #         y   p
     #             |
@@ -87,7 +87,7 @@ def test_backward_nn(atol):
     #             X   W
 
     # expected gradients from torch.Tensor
-    # y = torch.tensor([[0], [1]])
+    y = torch.tensor([[0], [1]])
     X = torch.randn(size=(2, 3), requires_grad=True)
     W = torch.randn(size=(3, 2), requires_grad=True)
     V = torch.randn(size=(2, 1), requires_grad=True)
@@ -98,10 +98,12 @@ def test_backward_nn(atol):
     l = U @ V
     l.retain_grad()
     p = torch.sigmoid(l)
-    p.sum().backward()
+    p.retain_grad()
+    loss = ((p - y) ** 2).sum()
+    loss.backward()
 
-    # observed gradients from nn.Tensor
-    # y_ = Tensor(y.detach().numpy())
+    # gradients from nn.Tensor
+    y_ = Tensor(y.detach().numpy())
     X_ = Tensor(X.detach().numpy())
     W_ = Tensor(W.detach().numpy())
     V_ = Tensor(V.detach().numpy())
@@ -109,15 +111,17 @@ def test_backward_nn(atol):
     U_ = Z_.relu()
     l_ = U_.dot(V_)
     p_ = l_.sigmoid()
-    p_.backward()
+    loss_ = (p_ - y_) ** 2
+    loss_.backward()
 
-    # test all gradients except root
+    # test all gradients
     assert np.allclose(X.grad.numpy(), X_.grad, atol=atol)
     assert np.allclose(W.grad.numpy(), W_.grad, atol=atol)
     assert np.allclose(V.grad.numpy(), V_.grad, atol=atol)
     assert np.allclose(Z.grad.numpy(), Z_.grad, atol=atol)
     assert np.allclose(U.grad.numpy(), U_.grad, atol=atol)
     assert np.allclose(l.grad.numpy(), l_.grad, atol=atol)
+    assert np.allclose(p.grad.numpy(), p_.grad, atol=atol)
 
 
 def test___repr__():

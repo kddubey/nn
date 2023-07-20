@@ -3,26 +3,6 @@ from __future__ import annotations
 import numpy as np
 
 
-def _reverse_topo_order(tensor: Tensor) -> list[Tensor]:
-    # strategy: regular topological order, and then reverse
-    nodes_ordered: list[Tensor] = []
-    _visited: set[Tensor] = set()
-
-    def dfs(node: Tensor):
-        _visited.add(node)
-        # regular topological order invariant: a node's children must be appended before
-        # appending itself
-        for child in node._inputs:
-            if child not in _visited:
-                dfs(child)
-        nodes_ordered.append(node)
-
-    dfs(tensor)  # nodes_ordered is leaves -> root
-    nodes_ordered.reverse()
-
-    return nodes_ordered
-
-
 class Tensor:
     def __init__(self, data: list[float]):
         self._data: np.ndarray = np.array(data)
@@ -49,6 +29,24 @@ class Tensor:
         # wrt some node if we know the "local gradient" and the gradient of the root wrt
         # the node's parent (we multiply the two). so we need to calculate gradients
         # from parents -> children or root -> leaves.
+        def _reverse_topo_order(tensor: Tensor) -> list[Tensor]:
+            # strategy: regular topological order, and then reverse
+            nodes_ordered: list[Tensor] = []
+            _visited: set[Tensor] = set()
+
+            def dfs(node: Tensor):
+                _visited.add(node)
+                # topological order invariant: a node's children must be appended before
+                # appending itself
+                for child in node._inputs:
+                    if child not in _visited:
+                        dfs(child)
+                nodes_ordered.append(node)
+
+            dfs(tensor)  # nodes_ordered is leaves -> root
+            nodes_ordered.reverse()
+            return nodes_ordered
+
         nodes_ordered = _reverse_topo_order(self)
 
         nodes_ordered[0].grad = 1  # derivative root wrt root. it was initialized to 0
@@ -91,6 +89,22 @@ class Tensor:
         out._backward = backward
         return out
 
+    def __pow__(self, other: float | int) -> Tensor:
+        if not isinstance(other, (float, int)):
+            raise TypeError("other must be a float")
+
+        data = self._data**other
+        out = Tensor(data)
+        out._inputs = {self}
+
+        self_grad = other * self._data ** (other - 1)
+
+        def backward():
+            self.grad += out.grad * self_grad
+
+        out._backward = backward
+        return out
+
     def dot(self, other: Tensor) -> Tensor:
         data = self._data @ other._data
         out = Tensor(data)
@@ -105,6 +119,9 @@ class Tensor:
 
         out._backward = backward
         return out
+
+    def sum(self) -> Tensor:
+        raise NotImplementedError
 
     def relu(self) -> Tensor:
         data = np.maximum(0, self._data)
@@ -136,30 +153,51 @@ class Tensor:
         raise NotImplementedError
 
     def negative_log_likelihood(self, label: int) -> Tensor:
+        raise NotImplementedError
         # input checks
-        if label not in {0, 1}:
-            raise ValueError("label must be 0 or 1.")
-        if self._data <= 0 or self._data >= 1:
-            raise ValueError("data must be a probability in (0, 1).")
+        # if label not in {0, 1}:
+        #     raise ValueError("label must be 0 or 1.")
+        # if self._data <= 0 or self._data >= 1:
+        #     raise ValueError("data must be a probability in (0, 1).")
 
-        if label == 0:
-            data = -np.log(1 - self._data)
-        else:  # it's 1
-            data = -np.log(self._data)
+        # if label == 0:
+        #     data = -np.log(1 - self._data)
+        # else:  # it's 1
+        #     data = -np.log(self._data)
 
-        out = Tensor(data)
-        out._inputs = {self}
+        # out = Tensor(data)
+        # out._inputs = {self}
 
-        if label == 0:
-            self_grad = 1 / self._data
-        else:  # it's 1
-            self_grad = 1 / (1 - self._data)
+        # if label == 0:
+        #     self_grad = 1 / self._data
+        # else:  # it's 1
+        #     self_grad = 1 / (1 - self._data)
 
-        def backward():
-            self.grad += out.grad * self_grad
+        # def backward():
+        #     self.grad += out.grad * self_grad
 
-        out._backward = backward
-        return out
+        # out._backward = backward
+        # return out
+
+    def concat(self, dim: int = -1) -> Tensor:
+        raise NotImplementedError
+
+    def __rmul__(self, other: Tensor | float | int) -> Tensor:
+        if isinstance(other, (float, int)):
+            other = Tensor([other])
+        return self * other  # just call the left-multiply, i.e., __mul__, method
+
+    def __neg__(self) -> Tensor:
+        return self * Tensor([-1])
+
+    def __sub__(self, other: Tensor | float | int) -> Tensor:
+        return self + (-other)
+
+    def __truediv__(self, other: Tensor | float | int) -> Tensor:
+        return self * Tensor([other**-1])
+
+    def __rtruediv__(self, other: Tensor | float | int) -> Tensor:
+        return other * self**-1
 
     def __repr__(self) -> str:
         # return the numpy array's repr but replace "array" with "Tensor", adjusting
