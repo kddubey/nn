@@ -63,12 +63,16 @@ def test_backward_multi_variable(atol):
 
 
 def test_backward_nn(atol):
-    # 1-hidden-layer binary regression. call this a hidden unit test ( ͡ ° ͜ʖ ͡ °)
+    # 1-hidden-layer binary regression. call it a hidden unit test ( ͡ ° ͜ʖ ͡ °)
     #         loss
     #           |
     #          MSE
     #          / \
     #         p   y
+    #         |
+    #        exp
+    #         |
+    #         o
     #         |
     #     log_sigmoid
     #         |
@@ -128,9 +132,11 @@ def test_backward_nn(atol):
     assert np.allclose(p.grad.numpy(), p_.grad, atol=atol)
 
 
-def test___repr__():
-    # for now just test that it runs
-    assert repr(Tensor([0]))
-    assert repr(Tensor([0, 0]))
-    assert repr(Tensor([[0, 0], [0, 0], [0, 0]]))
-    assert repr(Tensor([[[0, 0], [0, 0]]]))
+@pytest.mark.parametrize("shape", (1, 2, (2, 3), (2, 3, 4)))
+def test___repr__(shape):
+    # I have a (bad?) idea. If I change the name of the class from "Tensor" to "array",
+    # then, b/c of the way Tensor's repr works, it should be exactly the same as numpy's
+    # pretty repr. So let's do that for a few different shapes
+    Tensor.__name__ = "array"
+    numpy_array = np.zeros(shape)
+    assert repr(Tensor(numpy_array)) == repr(numpy_array)
