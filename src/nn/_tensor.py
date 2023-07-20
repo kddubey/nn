@@ -3,6 +3,15 @@ from __future__ import annotations
 import numpy as np
 
 
+# TODO: decorators that abstract out boilerplate when defining backprop-able functions
+def _single_var():
+    pass
+
+
+def _multi_var():
+    pass
+
+
 class Tensor:
     def __init__(self, data: list[float]):
         self._data: np.ndarray = np.array(data)
@@ -110,8 +119,8 @@ class Tensor:
         out = Tensor(data)
         out._inputs = {self, other}
 
-        # the following 6 lines of code took me ~2 hours to figure out. i dont think i
-        # even learned anything from that struggle lol
+        # the following 6 lines of code took me 2 hours to figure out. i dont think i
+        # even learned anything interesting during that struggle lol
         self_grad = other._data.T
         other_grad = self._data.T
 
@@ -142,6 +151,9 @@ class Tensor:
         return out
 
     def sigmoid(self) -> Tensor:
+        """
+        Hello. Please use `log_sigmoid`.
+        """
         data = 1 / (1 + np.exp(-self._data))
         out = Tensor(data)
         out._inputs = {self}
@@ -155,7 +167,43 @@ class Tensor:
         return out
 
     def log_sigmoid(self) -> Tensor:
-        raise NotImplementedError
+        data = -np.logaddexp(0, -self._data)
+        out = Tensor(data)
+        out._inputs = {self}
+
+        self_grad = 1 - np.exp(data)
+
+        def backward():
+            self.grad += out.grad * self_grad
+
+        out._backward = backward
+        return out
+
+    def exp(self) -> Tensor:
+        data = np.exp(self._data)
+        out = Tensor(data)
+        out._inputs = {self}
+
+        self_grad = data  # the only thing that can derive it is...itself o_O ... O_o
+
+        def backward():
+            self.grad += out.grad * self_grad
+
+        out._backward = backward
+        return out
+
+    def log(self) -> Tensor:
+        data = np.log(self._data)
+        out = Tensor(data)
+        out._inputs = {self}
+
+        self_grad = 1 / self._data
+
+        def backward():
+            self.grad += out.grad * self_grad
+
+        out._backward = backward
+        return out
 
     def log_softmax(self, dim: int = -1) -> Tensor:
         raise NotImplementedError

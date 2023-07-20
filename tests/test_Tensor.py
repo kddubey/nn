@@ -63,41 +63,43 @@ def test_backward_multi_variable(atol):
 
 
 def test_backward_nn(atol):
-    # 1-hidden-layer binary classification. computational graph:
+    # 1-hidden-layer binary regression. call this a hidden unit test ( ͡ ° ͜ʖ ͡ °)
     #         loss
     #           |
     #          MSE
     #          / \
-    #         y   p
-    #             |
-    #          sigmoid
-    #             |
-    #             l
-    #             |
-    #             @
-    #            / \
-    #           V   U
-    #               |
-    #              relu
-    #               |
-    #               Z
-    #               |
-    #               @
-    #              / \
-    #             X   W
+    #         p   y
+    #         |
+    #     log_sigmoid
+    #         |
+    #         l
+    #         |
+    #         @
+    #        / \
+    #       U   v
+    #       |
+    #      relu
+    #       |
+    #       Z
+    #       |
+    #       @
+    #      / \
+    #     X   W
 
     # expected gradients from torch.Tensor
     y = torch.tensor([[0], [1]])
     X = torch.randn(size=(2, 3), requires_grad=True)
     W = torch.randn(size=(3, 2), requires_grad=True)
-    V = torch.randn(size=(2, 1), requires_grad=True)
+    v = torch.randn(size=(2, 1), requires_grad=True)
     Z = X @ W
     Z.retain_grad()
     U = torch.relu(Z)
     U.retain_grad()
-    l = U @ V
+    l = U @ v
     l.retain_grad()
-    p = torch.sigmoid(l)
+    o: torch.Tensor = torch.nn.functional.logsigmoid(l)
+    o.retain_grad()
+    p = torch.exp(o)
     p.retain_grad()
     loss = ((p - y) ** 2).sum()
     loss.backward()
@@ -106,21 +108,23 @@ def test_backward_nn(atol):
     y_ = Tensor(y.detach().numpy())
     X_ = Tensor(X.detach().numpy())
     W_ = Tensor(W.detach().numpy())
-    V_ = Tensor(V.detach().numpy())
+    v_ = Tensor(v.detach().numpy())
     Z_ = X_ @ W_
     U_ = Z_.relu()
-    l_ = U_ @ V_
-    p_ = l_.sigmoid()
+    l_ = U_ @ v_
+    o_ = l_.log_sigmoid()
+    p_ = o_.exp()
     loss_ = (p_ - y_) ** 2
     loss_.backward()
 
     # test all gradients
     assert np.allclose(X.grad.numpy(), X_.grad, atol=atol)
     assert np.allclose(W.grad.numpy(), W_.grad, atol=atol)
-    assert np.allclose(V.grad.numpy(), V_.grad, atol=atol)
+    assert np.allclose(v.grad.numpy(), v_.grad, atol=atol)
     assert np.allclose(Z.grad.numpy(), Z_.grad, atol=atol)
     assert np.allclose(U.grad.numpy(), U_.grad, atol=atol)
     assert np.allclose(l.grad.numpy(), l_.grad, atol=atol)
+    assert np.allclose(o.grad.numpy(), o_.grad, atol=atol)
     assert np.allclose(p.grad.numpy(), p_.grad, atol=atol)
 
 
