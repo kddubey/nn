@@ -22,14 +22,9 @@ requirements_demos = [
 
 requirements_dev = [
     "black>=23.1.0",
-    "docutils<0.19",
-    "pydata-sphinx-theme>=0.13.1",
     "pytest>=7.2.1",
     "pytest-cov>=4.0.0",
-    "sphinx>=6.1.3",
-    "sphinx-togglebutton>=0.3.2",
-    "sphinxcontrib-napoleon>=0.7",
-    "twine>=4.0.2",
+    "torch>=2.0.1",
 ]
 
 

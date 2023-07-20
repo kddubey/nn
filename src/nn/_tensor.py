@@ -4,20 +4,6 @@ import numpy as np
 
 
 def _reverse_topo_order(tensor: Tensor) -> list[Tensor]:
-    """
-    Order all reachable Tensors from `tensor` such that a Tensor's parent always comes
-    before itself. This criterion is necessary for the chain rule.
-
-    Parameters
-    ----------
-    tensor : Tensor
-        the tensor whose partial derivatives need to be computed
-
-    Returns
-    -------
-    list[Tensor]
-        reverse-topological order of all reachable Tensors from `tensor`
-    """
     # strategy: regular topological order, and then reverse
     nodes_ordered: list[Tensor] = []
     _visited: set[Tensor] = set()
@@ -120,26 +106,26 @@ class Tensor:
         return out
 
     def dot(self, other: Tensor) -> Tensor:
-        data = self._data.T @ other._data
+        data = self._data @ other._data
         out = Tensor(data)
         out._inputs = {self, other}
 
-        self_grad = other._data
-        other_grad = self._data
+        self_grad = other._data.T
+        other_grad = self._data.T
 
         def backward():
-            self.grad += out.grad * self_grad
-            other.grad += out.grad * other_grad
+            self.grad += out.grad @ self_grad
+            other.grad += other_grad @ out.grad
 
         out._backward = backward
         return out
 
     def relu(self) -> Tensor:
-        data = max(0, self._data)
+        data = np.maximum(0, self._data)
         out = Tensor(data)
         out._inputs = {self}
 
-        self_grad = 0 if self._data < 0 else 1
+        self_grad = (data > 0).astype(self._data.dtype)
 
         def backward():
             self.grad += out.grad * self_grad
@@ -147,7 +133,7 @@ class Tensor:
         out._backward = backward
         return out
 
-    def log_sigmoid(self) -> Tensor:
+    def sigmoid(self) -> Tensor:
         data = 1 / (1 + np.exp(-self._data))
         out = Tensor(data)
         out._inputs = {self}
@@ -159,6 +145,9 @@ class Tensor:
 
         out._backward = backward
         return out
+
+    def log_softmax(self, dim: int = -1) -> Tensor:
+        raise NotImplementedError
 
     def negative_log_likelihood(self, label: int) -> Tensor:
         # input checks
