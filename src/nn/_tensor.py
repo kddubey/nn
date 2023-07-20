@@ -149,35 +149,14 @@ class Tensor:
         out._backward = backward
         return out
 
+    def log_sigmoid(self) -> Tensor:
+        raise NotImplementedError
+
     def log_softmax(self, dim: int = -1) -> Tensor:
         raise NotImplementedError
 
-    def negative_log_likelihood(self, label: int) -> Tensor:
+    def negative_log_likelihood(self, labels: list[int]) -> Tensor:
         raise NotImplementedError
-        # input checks
-        # if label not in {0, 1}:
-        #     raise ValueError("label must be 0 or 1.")
-        # if self._data <= 0 or self._data >= 1:
-        #     raise ValueError("data must be a probability in (0, 1).")
-
-        # if label == 0:
-        #     data = -np.log(1 - self._data)
-        # else:  # it's 1
-        #     data = -np.log(self._data)
-
-        # out = Tensor(data)
-        # out._inputs = {self}
-
-        # if label == 0:
-        #     self_grad = 1 / self._data
-        # else:  # it's 1
-        #     self_grad = 1 / (1 - self._data)
-
-        # def backward():
-        #     self.grad += out.grad * self_grad
-
-        # out._backward = backward
-        # return out
 
     def concat(self, dim: int = -1) -> Tensor:
         raise NotImplementedError
