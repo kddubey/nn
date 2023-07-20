@@ -44,9 +44,9 @@ def test_backward_single_variable():
 
 def test_backward_multi_variable():
     # expected gradients from torch.Tensor
-    X = torch.tensor([[0.0, 1.0], [2.0, 3.0]], requires_grad=True)
-    Y = torch.tensor([[4.0, 5.0], [6.0, 7.0]], requires_grad=True)
-    W = torch.tensor([[0.1, 0.2], [0.3, 0.4]], requires_grad=True)
+    X = torch.tensor([[0.0, 1.0], [2.0, 3.0], [4.0, 5.0]], requires_grad=True)
+    Y = torch.tensor([[6.0, 7.0], [8.0, 9.0], [10.0, 11.0]], requires_grad=True)
+    W = torch.tensor([[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]], requires_grad=True)
     Z = (X + Y) * W
     Z.sum().backward()
 
