@@ -107,9 +107,9 @@ def test_backward_nn(atol):
     X_ = Tensor(X.detach().numpy())
     W_ = Tensor(W.detach().numpy())
     V_ = Tensor(V.detach().numpy())
-    Z_ = X_.dot(W_)
+    Z_ = X_ @ W_
     U_ = Z_.relu()
-    l_ = U_.dot(V_)
+    l_ = U_ @ V_
     p_ = l_.sigmoid()
     loss_ = (p_ - y_) ** 2
     loss_.backward()

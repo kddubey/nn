@@ -110,6 +110,8 @@ class Tensor:
         out = Tensor(data)
         out._inputs = {self, other}
 
+        # the following 6 lines of code took me ~2 hours to figure out. i dont think i
+        # even learned anything from that struggle lol
         self_grad = other._data.T
         other_grad = self._data.T
 
@@ -119,6 +121,9 @@ class Tensor:
 
         out._backward = backward
         return out
+
+    def __matmul__(self, other: Tensor) -> Tensor:
+        return self.dot(other)
 
     def sum(self) -> Tensor:
         raise NotImplementedError
