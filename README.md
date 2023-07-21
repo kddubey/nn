@@ -8,5 +8,6 @@ Also, shoutout to broadcasting. Definitely in my top 3 algorithms I take for gra
 
 TODO:
 - [ ] `requires_grad` / freezing functionality
+- [ ] don't retain grads for non-leaf tensors
 - [ ] arbitrary shapes
 - [ ] basic NN framework

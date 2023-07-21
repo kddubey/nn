@@ -118,7 +118,7 @@ def test_backward_nn(atol):
     l_ = U_ @ v_
     o_ = l_.log_sigmoid()
     p_ = o_.exp()
-    loss_ = (p_ - y_) ** 2
+    loss_ = ((p_ - y_) ** 2).sum()
     loss_.backward()
 
     # test all gradients
@@ -130,6 +130,45 @@ def test_backward_nn(atol):
     assert np.allclose(l.grad.numpy(), l_.grad, atol=atol)
     assert np.allclose(o.grad.numpy(), o_.grad, atol=atol)
     assert np.allclose(p.grad.numpy(), p_.grad, atol=atol)
+
+
+def test_backward_getitem(atol):
+    # gradients from torch.Tensor
+    X = torch.randn(size=(2, 3), requires_grad=True)
+    z = torch.randn(size=(3,), requires_grad=True)
+    x = X[0, :]
+    x.retain_grad()
+    y = x @ z
+    y.retain_grad()
+    y.backward()
+
+    # gradients from nn.Tensor
+    X_ = Tensor(X.detach().numpy())
+    x_ = Tensor(x.detach().numpy())
+    z_ = Tensor(z.detach().numpy())
+    x_ = X_[0, :]
+    y_ = x_ @ z_
+    y_.backward()
+
+    assert np.all(X.grad.numpy() == X_.grad)
+    assert np.allclose(x.grad.numpy(), x_.grad, atol=atol)
+    assert np.allclose(z.grad.numpy(), z_.grad, atol=atol)
+
+
+def test_backward_transpose():
+    # gradients from torch.Tensor
+    X = torch.randn(size=(2, 3), requires_grad=True)
+    Y = X.T
+    Y.retain_grad()
+    Y.sum().backward()
+
+    # gradients from nn.Tensor
+    X_ = Tensor(X.detach().numpy())
+    Y_ = X_.T
+    Y_.backward()  # hmmm, not sure this is right
+
+    assert np.all(X.grad.numpy() == X_.grad)
+    assert np.all(Y.grad.numpy() == Y_.grad)
 
 
 @pytest.mark.parametrize("shape", (1, 2, (2, 3), (2, 3, 4)))

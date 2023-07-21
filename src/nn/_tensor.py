@@ -10,7 +10,7 @@ def _single_var(method):
     @wraps(method)
     def wrapper(self: Tensor, *args, **kwargs):
         data, grad = method(self, *args, **kwargs)
-        out = Tensor(data)  # we need to reference this for the chain_rule
+        out = Tensor(data)  # we need to reference this object for the chain_rule
         out._inputs = {self}
 
         def chain_rule():  # assume out.grad is set correctly
@@ -23,13 +23,20 @@ def _single_var(method):
 
 
 def _double_var(is_elt_wise: bool = True):
-    # is_elt_wise=False edge case is for matrix multiplication operations
+    # is_elt_wise=False edge case is for matrix/vector dot products
     def decorator(method):
         @wraps(method)
         def wrapper(self: Tensor, other: Tensor, *args, **kwargs):
             data, self_grad, other_grad = method(self, other, *args, **kwargs)
-            out = Tensor(data)
+            out = Tensor(data)  # we need to reference this object for the chain_rule
             out._inputs = {self, other}
+
+            nonlocal is_elt_wise  # lemme modify it based on data.shape
+            if not is_elt_wise:
+                if len(data.shape) == 0:  # vector-vector dot product = scalar
+                    is_elt_wise = True
+                elif len(data.shape) == 1:  # matrix-vector dot product = vector
+                    is_elt_wise = data.shape[0] == 1
 
             def chain_rule():  # assume out.grad is set correctly
                 if is_elt_wise:
@@ -109,14 +116,21 @@ class Tensor:
         other_grad = self._data.T
         return data, self_grad, other_grad
 
-    def sum(self, dim: int = -1) -> Tensor:
-        raise NotImplementedError
+    @_single_var
+    def sum(self, dim: int | None = None) -> Tensor:
+        data = self._data.sum(axis=dim)
+        grad = np.ones_like(self._data)
+        return data, grad
 
     @_single_var
     def relu(self) -> Tensor:
         data = np.maximum(0, self._data)
         grad = (data > 0).astype(self._data.dtype)
         return data, grad
+
+    def cross_entropy(self, labels: list[int]) -> Tensor:
+        # self._data are logits. labels are sparsely encoded
+        raise NotImplementedError
 
     @_single_var
     def sigmoid(self) -> Tensor:
@@ -150,6 +164,20 @@ class Tensor:
 
     def concat(self, other: Tensor, dim: int = -1) -> Tensor:
         raise NotImplementedError
+
+    @_single_var
+    def __getitem__(self, key) -> Tensor:
+        data = self._data[key]
+        grad = np.zeros_like(self._data)
+        grad[key] = 1
+        return data, grad
+
+    @property
+    @_single_var
+    def T(self) -> Tensor:
+        data = self._data.T
+        grad = np.ones_like(self.grad.T) if isinstance(self.grad, np.ndarray) else 1
+        return data, grad
 
     @_single_var
     def __pow__(self, exponent: float | int) -> Tensor:
@@ -196,7 +224,7 @@ class Tensor:
             + "\n"
             + "\n".join(whitespace + array_string for array_string in array_strings[1:])
         )
-        if len(self.shape) == 1:  # it's a 1-D array
+        if len(self.shape) <= 1:  # it's a 0-D or 1-D array
             data_repr = data_repr.rstrip("\n")
         return f"{class_name}({data_repr})"
 
@@ -204,9 +232,8 @@ class Tensor:
     def shape(self):
         return self._data.shape
 
-    @property
-    def T(self):
-        if self._inputs:
-            raise ValueError("Narrrgo!")
-        self._data = self._data.T
-        return self
+    def item(self):
+        if isinstance(self._data, np.ndarray):
+            return self._data
+        else:
+            raise ValueError("This Tensor has more than one item.")
