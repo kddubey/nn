@@ -143,6 +143,18 @@ class Tensor:
         raise NotImplementedError
 
     @_single_var
+    def exp(self) -> Tensor:
+        data = np.exp(self._data)
+        grad = data
+        return data, grad
+
+    @_single_var
+    def log(self) -> Tensor:
+        data = np.log(self._data)
+        grad = 1 / self._data
+        return data, grad
+
+    @_single_var
     def relu(self) -> Tensor:
         data = np.maximum(0, self._data)
         grad = (data > 0).astype(self._data.dtype)
@@ -162,18 +174,6 @@ class Tensor:
     def log_sigmoid(self) -> Tensor:
         data = -np.logaddexp(0, -self._data)
         grad = 1 - np.exp(data)
-        return data, grad
-
-    @_single_var
-    def exp(self) -> Tensor:
-        data = np.exp(self._data)
-        grad = data
-        return data, grad
-
-    @_single_var
-    def log(self) -> Tensor:
-        data = np.log(self._data)
-        grad = 1 / self._data
         return data, grad
 
     def log_softmax(self, dim: int = -1) -> Tensor:
@@ -236,7 +236,7 @@ class Tensor:
         return self._data.shape
 
     def item(self):
-        if isinstance(self._data, np.ndarray):
+        if not isinstance(self._data, np.ndarray):
             return self._data
         else:
             raise ValueError("This Tensor has more than one item.")
