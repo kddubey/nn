@@ -5,7 +5,7 @@ import numpy as np
 
 
 # These decorators reduce Tensor methods into returning (1) the output data and (2)
-# "local" gradient(s), which is exactly the elegance of backprop
+# "local" gradient(s)
 def _single_var(method):
     @wraps(method)
     def wrapper(self: Tensor, *args, **kwargs):
@@ -66,36 +66,6 @@ class Tensor:
             0  # only the root's grad is 1, rest 0 until the root is a function of it
         )
 
-    def backward(self):
-        # reverse-topological order, i.e., root -> leaves.
-        # that's b/c, for the chain rule, we can only define the gradient of the root
-        # wrt some node if we know the "local gradient" and the gradient of the root wrt
-        # the node's parent (we multiply the two). so we need to calculate gradients
-        # from parents -> children or root -> leaves.
-        def _reverse_topo_order(tensor: Tensor) -> list[Tensor]:
-            # strategy: regular topological order, and then reverse
-            nodes_ordered: list[Tensor] = []
-            _visited: set[Tensor] = set()
-
-            def dfs(node: Tensor):
-                _visited.add(node)
-                # topological order invariant: a node's children must be appended before
-                # appending itself
-                for child in node._inputs:
-                    if child not in _visited:
-                        dfs(child)
-                nodes_ordered.append(node)
-
-            dfs(tensor)  # nodes_ordered is leaves -> root
-            nodes_ordered.reverse()
-            return nodes_ordered
-
-        nodes_ordered = _reverse_topo_order(self)
-
-        nodes_ordered[0].grad = 1  # derivative root wrt root. it was initialized to 0
-        for node in nodes_ordered:
-            node._backward()
-
     @_double_var()
     def __add__(self, other: Tensor) -> Tensor:
         data = self._data + other._data
@@ -118,6 +88,14 @@ class Tensor:
         self_grad = other._data.T
         other_grad = self._data.T
         return data, self_grad, other_grad
+
+    @_single_var
+    def __pow__(self, exponent: float | int) -> Tensor:
+        if not isinstance(exponent, (float, int)):
+            raise TypeError(f"exponent must be a float/constant. Got {exponent}.")
+        data = self._data**exponent
+        grad = exponent * self._data ** (exponent - 1)
+        return data, grad
 
     @_single_var
     def sum(self, dim: int | None = None) -> Tensor:
@@ -182,14 +160,6 @@ class Tensor:
     def negative_log_likelihood(self, labels: list[int]) -> Tensor:
         raise NotImplementedError
 
-    @_single_var
-    def __pow__(self, exponent: float | int) -> Tensor:
-        if not isinstance(exponent, (float, int)):
-            raise TypeError(f"exponent must be a float/constant. Got {exponent}.")
-        data = self._data**exponent
-        grad = exponent * self._data ** (exponent - 1)
-        return data, grad
-
     def __matmul__(self, other: Tensor) -> Tensor:
         return self.dot(other)
 
@@ -209,6 +179,16 @@ class Tensor:
 
     def __rtruediv__(self, other: Tensor | float | int) -> Tensor:
         return other * self**-1
+
+    @property
+    def shape(self):
+        return self._data.shape
+
+    def item(self):
+        if not isinstance(self._data, np.ndarray):
+            return self._data
+        else:
+            raise ValueError("This Tensor has more than one item.")
 
     def __repr__(self) -> str:
         # return the numpy array's repr but replace "array" with "Tensor", adjusting
@@ -231,12 +211,32 @@ class Tensor:
             data_repr = data_repr.rstrip("\n")
         return f"{class_name}({data_repr})"
 
-    @property
-    def shape(self):
-        return self._data.shape
+    def backward(self):
+        # reverse-topological order, i.e., root -> leaves.
+        # that's b/c, for the chain rule, we can only define the gradient of the root
+        # wrt some node if we know the "local gradient" and the gradient of the root wrt
+        # the node's parent (we multiply the two). so we need to calculate gradients
+        # from parents -> children or root -> leaves.
+        def _reverse_topo_order(tensor: Tensor) -> list[Tensor]:
+            # strategy: regular topological order, and then reverse
+            nodes_ordered: list[Tensor] = []
+            _visited: set[Tensor] = set()
 
-    def item(self):
-        if not isinstance(self._data, np.ndarray):
-            return self._data
-        else:
-            raise ValueError("This Tensor has more than one item.")
+            def dfs(node: Tensor):
+                _visited.add(node)
+                # topological order invariant: a node's children must be appended before
+                # appending itself
+                for child in node._inputs:
+                    if child not in _visited:
+                        dfs(child)
+                nodes_ordered.append(node)
+
+            dfs(tensor)  # nodes_ordered is leaves -> root
+            nodes_ordered.reverse()
+            return nodes_ordered
+
+        nodes_ordered = _reverse_topo_order(self)
+
+        nodes_ordered[0].grad = 1  # derivative root wrt root. it was initialized to 0
+        for node in nodes_ordered:
+            node._backward()
