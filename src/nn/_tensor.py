@@ -83,9 +83,7 @@ class Tensor:
     @_double_var(is_elt_wise=False)
     def dot(self, other: Tensor) -> Tensor:
         data = self._data @ other._data
-        # the following 2 lines of code took me a while to figure out. i dont think i
-        # even learned anything interesting during that struggle lol
-        self_grad = other._data.T
+        self_grad = other._data.T  # had to think a bit about this one a bit
         other_grad = self._data.T
         return data, self_grad, other_grad
 
