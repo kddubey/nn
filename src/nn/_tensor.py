@@ -113,8 +113,14 @@ class Tensor:
     @_double_var()
     def __mul__(self, other: Tensor) -> Tensor:
         data = self._data * other._data
-        self_grad = other._data
-        other_grad = self._data
+
+        def match_shape(self: Tensor, other: Tensor):
+            if not other.shape:
+                return np.ones_like(self) * other._data
+            return other._data
+
+        self_grad = match_shape(self, other)
+        other_grad = match_shape(other, self)
         return data, self_grad, other_grad
 
     @_double_var(is_elt_wise=False)
@@ -163,17 +169,21 @@ class Tensor:
     ################################# RE-SHAPE METHODS #################################
     ####################################################################################
 
-    @_single_var
     def __getitem__(self, key) -> Tensor:
         data = self._data[key]
-        grad = np.zeros_like(self._data)
-        grad[key] = 1
-        return data, grad
+        out = Tensor(data)  # we need to reference this object for the chain_rule
+        out._inputs = {self}
 
-    # this one has to be handled separately I think
+        def chain_rule():  # assume out.grad is set correctly
+            grad = np.zeros_like(self._data)
+            grad[key] = out.grad
+            self.grad += grad
+
+        out._backward = chain_rule
+        return out
+
     def take_along_dim(self, indices, dim: int | None) -> Tensor:
         data = np.take_along_axis(self._data, indices, axis=dim)
-
         out = Tensor(data)  # we need to reference this object for the chain_rule
         out._inputs = {self}
 

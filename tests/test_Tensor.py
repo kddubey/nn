@@ -45,6 +45,7 @@ def test_backward_single_variable():
     da_root = a + b
     da_root.backward()
 
+    # easy enough to test conceptually and manually
     assert np.all(da_root.grad == 1)
     assert np.all(b.grad == 1)
     assert np.all(a.grad == 1)
@@ -180,8 +181,8 @@ def test_backward_nn(atol):
 def test___getitem__(atol):
     # torch.Tensor
     X = torch.randn(size=(2, 3), requires_grad=True)
-    z = torch.randn(size=(3,), requires_grad=True)
-    x = X[0, :]
+    z = torch.randn(size=(2,), requires_grad=True)
+    x = X[0, 0:2]
     x.retain_grad()
     y = x @ z
     y.retain_grad()
@@ -190,7 +191,7 @@ def test___getitem__(atol):
     # nn.Tensor
     X_ = nn.Tensor(X.detach().numpy())
     z_ = nn.Tensor(z.detach().numpy())
-    x_ = X_[0, :]
+    x_ = X_[0, 0:2]
     y_ = x_ @ z_
     y_.backward()
 
