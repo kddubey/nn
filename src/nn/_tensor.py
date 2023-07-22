@@ -196,11 +196,16 @@ class Tensor:
         return out
 
     @property
-    @_single_var
     def T(self) -> Tensor:
         data = self._data.T
-        grad = np.ones_like(self.grad.T) if isinstance(self.grad, np.ndarray) else 1
-        return data, grad
+        out = Tensor(data)  # we need to reference this object for the chain_rule
+        out._inputs = {self}
+
+        def chain_rule():  # assume out.grad is set correctly
+            self.grad += out.grad.T
+
+        out._backward = chain_rule
+        return out
 
     def cat(self, other: Tensor, dim: int = -1) -> Tensor:
         raise NotImplementedError

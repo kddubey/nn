@@ -227,20 +227,25 @@ def test_take_along_dim(atol):
     assert np.allclose(A.grad.numpy(), A_.grad, atol=atol)
 
 
-def test_transpose():
+def test_T():
     # torch.Tensor
     X = torch.randn(size=(2, 3), requires_grad=True)
+    W = torch.randn(size=(2, 3), requires_grad=True)
     Y = X.T
     Y.retain_grad()
-    Y.sum().backward()
+    Z = Y @ W
+    Z.sum().backward()
 
     # nn.Tensor
     X_ = nn.Tensor(X.detach().numpy())
+    W_ = nn.Tensor(W.detach().numpy())
     Y_ = X_.T
-    Y_.backward()  # hmmm, not sure this is right
+    Z_ = Y_ @ W_
+    Z_.sum().backward()
 
     assert np.all(Y.grad.numpy() == Y_.grad)
     assert np.all(X.grad.numpy() == X_.grad)
+    assert np.all(W.grad.numpy() == W_.grad)
 
 
 @pytest.mark.parametrize("shape", (1, 2, (2, 3), (2, 3, 4)))
