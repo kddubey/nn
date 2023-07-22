@@ -23,7 +23,7 @@ def _single_var(method):
 
 
 def _double_var(is_elt_wise: bool = True):
-    # is_elt_wise=False edge case is for matrix/vector dot products
+    # is_elt_wise = False is for matrix dot products
     def decorator(method):
         @wraps(method)
         def wrapper(self: Tensor, other: Tensor, *args, **kwargs):
@@ -31,11 +31,14 @@ def _double_var(is_elt_wise: bool = True):
             out = Tensor(data)  # we need to reference this object for the chain_rule
             out._inputs = {self, other}
 
+            # self and other could be vectors (shape is (d,) not (d, 1)) or scalars.
+            # in these cases, the correct operator to combine gradients via the chain
+            # rule is multiplication, not the dot product
             nonlocal is_elt_wise  # lemme modify it based on data.shape
             if not is_elt_wise:
-                if len(data.shape) == 0:  # vector-vector dot product = scalar
+                if len(data.shape) == 0:  # scalar = vector-vector dot product
                     is_elt_wise = True
-                elif len(data.shape) == 1:  # matrix-vector dot product = vector
+                elif len(data.shape) == 1:  # vector = matrix-vector dot product
                     is_elt_wise = data.shape[0] == 1
 
             def chain_rule():  # assume out.grad is set correctly
@@ -123,6 +126,23 @@ class Tensor:
         return data, grad
 
     @_single_var
+    def __getitem__(self, key) -> Tensor:
+        data = self._data[key]
+        grad = np.zeros_like(self._data)
+        grad[key] = 1
+        return data, grad
+
+    @property
+    @_single_var
+    def T(self) -> Tensor:
+        data = self._data.T
+        grad = np.ones_like(self.grad.T) if isinstance(self.grad, np.ndarray) else 1
+        return data, grad
+
+    def concat(self, other: Tensor, dim: int = -1) -> Tensor:
+        raise NotImplementedError
+
+    @_single_var
     def relu(self) -> Tensor:
         data = np.maximum(0, self._data)
         grad = (data > 0).astype(self._data.dtype)
@@ -161,23 +181,6 @@ class Tensor:
 
     def negative_log_likelihood(self, labels: list[int]) -> Tensor:
         raise NotImplementedError
-
-    def concat(self, other: Tensor, dim: int = -1) -> Tensor:
-        raise NotImplementedError
-
-    @_single_var
-    def __getitem__(self, key) -> Tensor:
-        data = self._data[key]
-        grad = np.zeros_like(self._data)
-        grad[key] = 1
-        return data, grad
-
-    @property
-    @_single_var
-    def T(self) -> Tensor:
-        data = self._data.T
-        grad = np.ones_like(self.grad.T) if isinstance(self.grad, np.ndarray) else 1
-        return data, grad
 
     @_single_var
     def __pow__(self, exponent: float | int) -> Tensor:
