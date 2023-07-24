@@ -5,6 +5,9 @@ import numpy as np
 
 
 def _force_transpose(array: np.ndarray) -> np.ndarray:
+    # it's easier for me to code up the chain-rule-via-dot-product (Jacobian-gradient
+    # dot product) when we explicitly transpose the "local" gradients, as we do in the
+    # math
     if len(np.shape(array)) == 1:
         return array[:, np.newaxis].T
     return array.T
@@ -15,21 +18,24 @@ def _dot_and_maybe_squeeze(
     x: np.ndarray,
     y: np.ndarray,
 ) -> np.ndarray:
+    # if the "local" gradient was transposed from a numpy vector (n,) to a numpy matrix
+    # (1, n), then we should ensure that the gradient has shape (n,). o.w. tensor -
+    # tensor.grad broadcasts incorrectly. I basically treat this fxn as "do the dot
+    # product that lines up w/ the math"
     z = x @ y
     if len(z.shape) > len(og_shape):
         z = z.squeeze(-1)
     return z
 
 
-def _matrix_vector_chain_rule(
+def _dot_product_chain_rule(
     self: Tensor,
     other: Tensor,
     out: Tensor,
     self_grad: np.ndarray,
     other_grad: np.ndarray,
 ) -> None:
-    # for the dot product method. it's easier to handle it / overcome np.dot limitations
-    # after knowing out.grad
+    # I need to overcome some limitations of numpy's dot product
     if not np.shape(out.grad):  # it's a scalar
         func_self = np.multiply
         func_other = np.multiply
@@ -67,7 +73,7 @@ def _single_var(method):
 
 
 def _double_var(is_elt_wise: bool = True):
-    # is_elt_wise = False is for matrix dot products
+    # is_elt_wise = False is for dot products
     def decorator(method):
         @wraps(method)
         def wrapper(self: Tensor, other: Tensor, *args, **kwargs):
@@ -80,7 +86,7 @@ def _double_var(is_elt_wise: bool = True):
                     self.grad += out.grad * self_grad
                     other.grad += out.grad * other_grad
                 else:  # tricky
-                    _matrix_vector_chain_rule(self, other, out, self_grad, other_grad)
+                    _dot_product_chain_rule(self, other, out, self_grad, other_grad)
 
             out._backward = chain_rule
             return out
@@ -138,6 +144,13 @@ class Tensor:
         grad = exponent * self._data ** (exponent - 1)
         return data, grad
 
+    @_single_var
+    def sum(self, dim: int | None = None) -> Tensor:
+        # TODO: check dim not None
+        data = self._data.sum(axis=dim)
+        grad = np.ones_like(self._data)
+        return data, grad
+
     def __matmul__(self, other: Tensor) -> Tensor:
         return self.dot(other)
 
@@ -157,13 +170,6 @@ class Tensor:
 
     def __rtruediv__(self, other: Tensor | float | int) -> Tensor:
         return other * self**-1
-
-    @_single_var
-    def sum(self, dim: int | None = None) -> Tensor:
-        # TODO: check dim not None
-        data = self._data.sum(axis=dim)
-        grad = np.ones_like(self._data)
-        return data, grad
 
     ####################################################################################
     ################################# RE-SHAPE METHODS #################################
@@ -253,6 +259,7 @@ class Tensor:
         grad = 1 - np.exp(data)
         return data, grad
 
+    @_single_var
     def log_softmax(self, dim: int = -1) -> Tensor:
         raise NotImplementedError
 
@@ -260,11 +267,14 @@ class Tensor:
     ################################## LOSS FUNCTIONS ##################################
     ####################################################################################
 
+    @_single_var
     def cross_entropy(self, labels: list[int]) -> Tensor:
-        # self._data are logits. labels are sparsely encoded
+        # self._data are logits. labels are sparsely encoded, so no soft labels
         raise NotImplementedError
 
+    @_single_var
     def negative_log_likelihood(self, labels: list[int]) -> Tensor:
+        # self._data are log-probs. labels are sparsely encoded, so no soft labels
         raise NotImplementedError
 
     ####################################################################################

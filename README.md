@@ -3,7 +3,7 @@ Neural network training and inference using only NumPy, vectorized. AKA
 [micrograd](https://github.com/karpathy/micrograd) but w/ 2-D matrices.
 
 <details>
-<summary>Tips for others who want to re-implement backprop:</summary>
+<summary>Tips for others who want to re-implement backprop</summary>
 
 - Watch this [extremely good video](https://www.youtube.com/watch?v=VMj-3S1tku0) (you
   can probably skip the last 40 min). I first learned backprop through math, and didn't
@@ -25,3 +25,6 @@ Neural network training and inference using only NumPy, vectorized. AKA
 - [ ] don't retain grads for non-leaf tensors
 - [ ] arbitrary shapes
 - [ ] basic NN framework
+- [ ] tests
+  - [ ] explicitly check that `(tensor - tensor.grad).shape == tensor.shape`
+  - [ ] clever way to test `nn` code just by typing out `torch` code
