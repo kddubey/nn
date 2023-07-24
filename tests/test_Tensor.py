@@ -292,6 +292,31 @@ def test_T(atol):
     assert np.allclose(W.grad.numpy(), W_.grad, atol)
 
 
+def test_cross_entropy(atol):
+    # torch.Tensor
+    X = torch.randn(size=(2, 3), requires_grad=True)
+    W = torch.randn(size=(3, 4), requires_grad=True)
+    y = torch.randint(low=0, high=W.shape[1], size=(X.shape[0],))
+    L = X @ W
+    W.retain_grad()
+    X.retain_grad()
+    L.retain_grad()
+    l = torch.nn.functional.cross_entropy(L, y, reduction="mean")
+    l.backward()
+
+    # nn.Tensor
+    X_ = nn.Tensor(X.detach().numpy())
+    W_ = nn.Tensor(W.detach().numpy())
+    y_ = y.detach().numpy()
+    L_ = X_ @ W_
+    l_ = L_.cross_entropy(y_, reduction="mean")
+    l_.backward()
+
+    assert np.allclose(L.grad.numpy(), L_.grad, atol)
+    assert np.allclose(W.grad.numpy(), W_.grad, atol)
+    assert np.allclose(X.grad.numpy(), X_.grad, atol)
+
+
 @pytest.mark.parametrize("shape", (1, 2, (2, 3), (2, 3, 4)))
 def test___repr__(shape):
     # I have a (bad?) idea. If I change the name of the class from "Tensor" to "array",

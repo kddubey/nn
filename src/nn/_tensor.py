@@ -4,6 +4,34 @@ from functools import partial, wraps
 import numpy as np
 
 
+def _log_sum_exp(
+    array: np.ndarray,
+    dim: int | None = None,
+    keepdims: bool = False,
+) -> np.ndarray:
+    # adapted from scipy:
+    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.logsumexp.html
+    array_maxs: np.ndarray = np.amax(array, axis=dim, keepdims=True)
+
+    if array_maxs.ndim > 0:
+        array_maxs[~np.isfinite(array_maxs)] = 0
+    elif not np.isfinite(array_maxs):
+        array_maxs = 0
+
+    tmp = np.exp(array - array_maxs)
+
+    # suppress warnings about log of zero
+    with np.errstate(divide="ignore"):
+        summed = np.sum(tmp, axis=dim, keepdims=keepdims)
+        out = np.log(summed)
+
+    if not keepdims:
+        array_maxs = np.squeeze(array_maxs, axis=dim)
+    out += array_maxs
+
+    return out
+
+
 def _force_transpose(array: np.ndarray) -> np.ndarray:
     # it's easier for me to code up the chain-rule-via-dot-product (Jacobian-gradient
     # dot product) when we explicitly transpose the "local" gradients, as we do in the
@@ -199,6 +227,13 @@ class Tensor:
     ################################# RE-SHAPE METHODS #################################
     ####################################################################################
 
+    def mean(self, dim: int | None = None) -> Tensor:
+        sum_ = self.sum(dim=dim)
+        try:
+            return sum_ / self.shape[dim]
+        except IndexError:
+            return sum_
+
     def __getitem__(self, key) -> Tensor:
         # TODO: add answer key explanation
         data = self._data[key]
@@ -295,28 +330,46 @@ class Tensor:
     ####################################################################################
 
     @_single_var
-    def cross_entropy(self, labels: list[int]) -> Tensor:
-        # self._data are logits. labels are sparsely encoded, so no soft labels
-        raise NotImplementedError
+    def cross_entropy(self, labels: list[int], reduction: str = "mean") -> Tensor:
+        # self._data are logits, i.e., unnormalized log-probabilities. labels are
+        # sparsely encoded, so no soft labels
+        # TODO: support observation weights
+        if reduction not in {"sum", "mean"}:
+            raise ValueError('reduction must be either "sum" or "mean".')
 
-    @_single_var
-    def negative_log_likelihood(self, labels: list[int]) -> Tensor:
-        # self._data are log-probs. labels are sparsely encoded, so no soft labels
-        raise NotImplementedError
+        # TODO: add answer key explanation
+        y = np.array(labels)[:, np.newaxis]
+        log_sum_exp = _log_sum_exp(self._data, dim=1, keepdims=True)
+        data = (
+            -np.take_along_axis(self._data, indices=y, axis=1).sum() + log_sum_exp.sum()
+        )
+
+        # data is the loss value. now for the gradient
+        softmax = np.exp(self._data - log_sum_exp)
+        is_label = np.zeros_like(self._data)
+        np.put_along_axis(is_label, indices=y, values=1, axis=1)
+        grad = softmax - is_label
+        if reduction == "mean":
+            denominator = len(labels)
+            return data / denominator, grad / denominator
+        return data, grad
 
     ####################################################################################
     ############################## CONVENIENCE FUNCTIONS ###############################
     ####################################################################################
 
+    def __len__(self) -> int:
+        return "wtf"
+
     @property
-    def shape(self):
+    def shape(self) -> tuple[int]:
         return np.shape(self._data)
 
     @property
-    def ndim(self):
+    def ndim(self) -> int:
         return len(self.shape)
 
-    def item(self):
+    def item(self) -> float:
         if not isinstance(self._data, np.ndarray):
             return self._data
         else:
@@ -347,7 +400,7 @@ class Tensor:
     ##################################### BACKWARD #####################################
     ####################################################################################
 
-    def backward(self):
+    def backward(self) -> None:
         # reverse-topological order, i.e., root -> leaves.
         # that's b/c, for the chain rule, we can only define the gradient of the root
         # wrt some node if we know the "local gradient" and the gradient of the root wrt
