@@ -144,12 +144,36 @@ class Tensor:
         grad = exponent * self._data ** (exponent - 1)
         return data, grad
 
-    @_single_var
     def sum(self, dim: int | None = None) -> Tensor:
-        # TODO: check dim not None
+        # TODO: add answer key explanation
         data = self._data.sum(axis=dim)
-        grad = np.ones_like(self._data)
-        return data, grad
+        out = Tensor(data)  # we need to reference this object for the chain_rule
+        out._inputs = {self}
+
+        def chain_rule():  # assume out.grad is set correctly
+            if dim is None or (self.ndim <= 1 and dim == 0):
+                # out.grad is a scalar
+                grad = np.repeat(out.grad, repeats=self._data.size).reshape(
+                    self._data.shape
+                )
+            elif dim == 0:
+                # out.grad is a vector w/ shape (self.shape[1],) or (m,)
+                grad = np.repeat(
+                    out.grad[np.newaxis, :],  # make it 1 x m
+                    repeats=self.shape[0],
+                    axis=0,  # repeat n times to make it n x m
+                )
+            elif dim == 1:
+                # out.grad is a vector w/ shape (self.shape[0],) or (n,)
+                grad = np.repeat(
+                    out.grad[:, np.newaxis],  # make it n x 1
+                    repeats=self.shape[1],
+                    axis=1,  # repeat m times to make it n x m
+                )
+            self.grad += grad
+
+        out._backward = chain_rule
+        return out
 
     def __matmul__(self, other: Tensor) -> Tensor:
         return self.dot(other)
@@ -176,6 +200,7 @@ class Tensor:
     ####################################################################################
 
     def __getitem__(self, key) -> Tensor:
+        # TODO: add answer key explanation
         data = self._data[key]
         out = Tensor(data)  # we need to reference this object for the chain_rule
         out._inputs = {self}
@@ -189,6 +214,7 @@ class Tensor:
         return out
 
     def take_along_dim(self, indices, dim: int | None) -> Tensor:
+        # TODO: add answer key explanation
         data = np.take_along_axis(self._data, indices, axis=dim)
         out = Tensor(data)  # we need to reference this object for the chain_rule
         out._inputs = {self}
@@ -203,6 +229,7 @@ class Tensor:
 
     @property
     def T(self) -> Tensor:
+        # TODO: add answer key explanation
         data = self._data.T
         out = Tensor(data)  # we need to reference this object for the chain_rule
         out._inputs = {self}
@@ -283,7 +310,11 @@ class Tensor:
 
     @property
     def shape(self):
-        return self._data.shape
+        return np.shape(self._data)
+
+    @property
+    def ndim(self):
+        return len(self.shape)
 
     def item(self):
         if not isinstance(self._data, np.ndarray):

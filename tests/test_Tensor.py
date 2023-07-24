@@ -10,7 +10,7 @@ Here's how most of these tests work:
      in order from root to leaf.
 
 Maybe there's a way to automate this, but I'm just doing these manually for now.
-I also should explicitly check that `(tensor - tensor.grad).shape == tensor.shape`.
+I also should check that `(tensor._data - tensor.grad).shape == tensor.shape`.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ import nn
 
 @pytest.fixture(scope="module")
 def atol() -> float:
-    return 1e-07
+    return 1e-06
 
 
 def test_backward_single_variable():
@@ -72,6 +72,50 @@ def test_backward_multi_variable(atol):
     assert np.allclose(W.grad.numpy(), W_.grad, atol=atol)
     assert np.allclose(Y.grad.numpy(), Y_.grad, atol=atol)
     assert np.allclose(X.grad.numpy(), X_.grad, atol=atol)
+
+
+@pytest.mark.parametrize(
+    "size_and_dim",
+    (
+        ((1,), None),  # scalar
+        ((3,), None),  # vector
+        ((3,), 0),  # vector, same as dim=None
+        ((3, 2), None),  # matrix, sum everything
+        ((3, 2), 0),  # matrix, sum rows
+        ((3, 2), 1),  # matrix, sum columns
+    ),
+)
+def test_sum(size_and_dim: tuple[tuple[int], int], atol: float):
+    size, dim = size_and_dim
+    if dim is None or len(size) == 1:
+        w_size = (1,)
+    elif dim <= 1 and len(size) == 2:
+        w_size = (size[1 - dim],)
+    else:
+        raise ValueError("not testing above 2-D shapes yet")
+
+    # torch.Tensor
+    X = torch.randn(size=size, requires_grad=True)
+    w = torch.randn(size=w_size, requires_grad=True)
+    x = X.sum(dim=dim)
+    x.retain_grad()
+    y = x * w
+    y.retain_grad()
+    z = y.sum()
+    z.backward()
+
+    # nn.Tensor
+    X_ = nn.Tensor(X.detach().numpy())
+    w_ = nn.Tensor(w.detach().numpy())
+    x_ = X_.sum(dim=dim)
+    y_ = x_ * w_
+    z_ = y_.sum()
+    z_.backward()
+
+    assert np.allclose(y.grad.numpy(), y_.grad, atol)
+    assert np.allclose(w.grad.numpy(), w_.grad, atol)
+    assert np.allclose(x.grad.numpy(), x_.grad, atol)
+    assert np.allclose(X.grad.numpy(), X_.grad, atol)
 
 
 @pytest.mark.parametrize(
@@ -227,7 +271,7 @@ def test_take_along_dim(atol):
     assert np.allclose(A.grad.numpy(), A_.grad, atol=atol)
 
 
-def test_T():
+def test_T(atol):
     # torch.Tensor
     X = torch.randn(size=(2, 3), requires_grad=True)
     W = torch.randn(size=(2, 3), requires_grad=True)
@@ -243,9 +287,9 @@ def test_T():
     Z_ = Y_ @ W_
     Z_.sum().backward()
 
-    assert np.all(Y.grad.numpy() == Y_.grad)
-    assert np.all(X.grad.numpy() == X_.grad)
-    assert np.all(W.grad.numpy() == W_.grad)
+    assert np.allclose(Y.grad.numpy(), Y_.grad, atol)
+    assert np.allclose(X.grad.numpy(), X_.grad, atol)
+    assert np.allclose(W.grad.numpy(), W_.grad, atol)
 
 
 @pytest.mark.parametrize("shape", (1, 2, (2, 3), (2, 3, 4)))

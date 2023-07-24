@@ -26,5 +26,5 @@ Neural network training and inference using only NumPy, vectorized. AKA
 - [ ] arbitrary shapes
 - [ ] basic NN framework
 - [ ] tests
-  - [ ] explicitly check that `(tensor - tensor.grad).shape == tensor.shape`
+  - [ ] explicitly check that `(tensor._data - tensor.grad).shape == tensor.shape`
   - [ ] clever way to test `nn` code just by typing out `torch` code
