@@ -10,6 +10,7 @@ Here's how most of these tests work:
      in order from root to leaf.
 
 Maybe there's a way to automate this, but I'm just doing these manually for now.
+Also I need to test that forward is correct too lol
 I also should check that `(tensor._data - tensor.grad).shape == tensor.shape`.
 """
 from __future__ import annotations
@@ -24,6 +25,14 @@ import nn
 @pytest.fixture(scope="module")
 def atol() -> float:
     return 1e-06
+
+
+def test__log_sum_exp(atol):
+    # torch.Tensor
+    X = torch.randn(size=(4, 3))
+    lse_torch = torch.logsumexp(X, dim=1, keepdim=True)
+    lse_nn = nn._tensor._log_sum_exp(X.numpy(), dim=1, keepdims=True)
+    assert np.allclose(lse_torch, lse_nn, atol=atol)
 
 
 def test_backward_single_variable():
@@ -292,10 +301,33 @@ def test_T(atol):
     assert np.allclose(W.grad.numpy(), W_.grad, atol)
 
 
+# def test_log_softmax(atol):
+#     # torch.Tensor
+#     X = torch.randn(size=(2, 2), requires_grad=True)
+#     W = torch.randn(size=(2, 3), requires_grad=True)
+#     L = X @ W
+#     W.retain_grad()
+#     X.retain_grad()
+#     L.retain_grad()
+#     l = L.log_softmax(dim=1)
+#     l.sum().backward()
+
+#     # nn.Tensor
+#     X_ = nn.Tensor(X.detach().numpy())
+#     W_ = nn.Tensor(W.detach().numpy())
+#     L_ = X_ @ W_
+#     l_ = L_.log_softmax()
+#     l_.sum().backward()
+
+#     assert np.allclose(L.grad.numpy(), L_.grad, atol)
+#     assert np.allclose(W.grad.numpy(), W_.grad, atol)
+#     assert np.allclose(X.grad.numpy(), X_.grad, atol)
+
+
 def test_cross_entropy(atol):
     # torch.Tensor
-    X = torch.randn(size=(2, 3), requires_grad=True)
-    W = torch.randn(size=(3, 4), requires_grad=True)
+    X = torch.randn(size=(2, 2), requires_grad=True)
+    W = torch.randn(size=(2, 3), requires_grad=True)
     y = torch.randint(low=0, high=W.shape[1], size=(X.shape[0],))
     L = X @ W
     W.retain_grad()

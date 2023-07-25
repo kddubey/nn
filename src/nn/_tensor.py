@@ -172,6 +172,30 @@ class Tensor:
         grad = exponent * self._data ** (exponent - 1)
         return data, grad
 
+    def __matmul__(self, other: Tensor) -> Tensor:
+        return self.dot(other)
+
+    def __rmul__(self, other: Tensor | float | int) -> Tensor:
+        if isinstance(other, (float, int)):
+            other = Tensor([other])
+        return self * other  # just call the left-multiply, i.e., __mul__, method
+
+    def __neg__(self) -> Tensor:
+        return self * Tensor([-1])
+
+    def __sub__(self, other: Tensor | float | int) -> Tensor:
+        return self + (-other)
+
+    def __truediv__(self, other: Tensor | float | int) -> Tensor:
+        return self * Tensor([other**-1])
+
+    def __rtruediv__(self, other: Tensor | float | int) -> Tensor:
+        return other * self**-1
+
+    ####################################################################################
+    ################################# RE-SHAPE METHODS #################################
+    ####################################################################################
+
     def sum(self, dim: int | None = None) -> Tensor:
         # TODO: add answer key explanation
         data = self._data.sum(axis=dim)
@@ -202,30 +226,6 @@ class Tensor:
 
         out._backward = chain_rule
         return out
-
-    def __matmul__(self, other: Tensor) -> Tensor:
-        return self.dot(other)
-
-    def __rmul__(self, other: Tensor | float | int) -> Tensor:
-        if isinstance(other, (float, int)):
-            other = Tensor([other])
-        return self * other  # just call the left-multiply, i.e., __mul__, method
-
-    def __neg__(self) -> Tensor:
-        return self * Tensor([-1])
-
-    def __sub__(self, other: Tensor | float | int) -> Tensor:
-        return self + (-other)
-
-    def __truediv__(self, other: Tensor | float | int) -> Tensor:
-        return self * Tensor([other**-1])
-
-    def __rtruediv__(self, other: Tensor | float | int) -> Tensor:
-        return other * self**-1
-
-    ####################################################################################
-    ################################# RE-SHAPE METHODS #################################
-    ####################################################################################
 
     def mean(self, dim: int | None = None) -> Tensor:
         sum_ = self.sum(dim=dim)
@@ -321,9 +321,25 @@ class Tensor:
         grad = 1 - np.exp(data)
         return data, grad
 
-    @_single_var
-    def log_softmax(self, dim: int = -1) -> Tensor:
+    def log_softmax(self) -> Tensor:
         raise NotImplementedError
+        # this one is kinda hard
+        # TODO: add answer key explanation
+        log_sum_exp = _log_sum_exp(self._data, dim=1, keepdims=True)
+        data = self._data - log_sum_exp
+        softmax = np.exp(data)
+        grad = np.zeros(shape=(self.shape[0], self.shape[1], self.shape[1]))
+        for i in range(self.shape[0]):
+            grad[i] = np.eye(self.shape[1]) - softmax[i]
+
+        out = Tensor(data)  # we need to reference this object for the chain_rule
+        out._inputs = {self}
+
+        def chain_rule():  # assume out.grad is set correctly
+            raise NotImplementedError
+
+        out._backward = chain_rule
+        return out
 
     ####################################################################################
     ################################## LOSS FUNCTIONS ##################################
@@ -331,15 +347,15 @@ class Tensor:
 
     @_single_var
     def cross_entropy(self, labels: list[int], reduction: str = "mean") -> Tensor:
-        # self._data are logits, i.e., unnormalized log-probabilities. labels are
-        # sparsely encoded, so no soft labels
+        # self._data are logits, i.e., unnormalized log-probabilities, across dim 1.
+        # labels are sparsely encoded, so no soft labels.
         # TODO: support observation weights
         if reduction not in {"sum", "mean"}:
             raise ValueError('reduction must be either "sum" or "mean".')
 
         # TODO: add answer key explanation
-        y = np.array(labels)[:, np.newaxis]
         log_sum_exp = _log_sum_exp(self._data, dim=1, keepdims=True)
+        y = np.array(labels)[:, np.newaxis]
         data = (
             -np.take_along_axis(self._data, indices=y, axis=1).sum() + log_sum_exp.sum()
         )
@@ -349,13 +365,14 @@ class Tensor:
         is_label = np.zeros_like(self._data)
         np.put_along_axis(is_label, indices=y, values=1, axis=1)
         grad = softmax - is_label
+
         if reduction == "mean":
             denominator = len(labels)
             return data / denominator, grad / denominator
         return data, grad
 
     ####################################################################################
-    ############################## CONVENIENCE FUNCTIONS ###############################
+    ################################## CONVENIENCES ####################################
     ####################################################################################
 
     def __len__(self) -> int:
@@ -381,7 +398,7 @@ class Tensor:
         numpy_name = "array"
         class_name = self.__class__.__name__
         array_strings = (
-            repr(self._data)
+            repr(self._data.round(4))
             .removeprefix(f"{numpy_name}(")
             .removesuffix(")")
             .split("\n")
