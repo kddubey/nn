@@ -359,7 +359,7 @@ class Tensor:
         else:
             raise ValueError('reduction must be either "sum" or "mean".')
 
-        y = target[:, np.newaxis]
+        y = np.array(target)[:, np.newaxis]
         return (
             self.take_along_dim(indices=y, dim=1)
             .__neg__()
