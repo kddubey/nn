@@ -322,21 +322,24 @@ class Tensor:
         return data, grad
 
     def log_softmax(self) -> Tensor:
-        raise NotImplementedError
-        # this one is kinda hard
         # TODO: add answer key explanation
         log_sum_exp = _log_sum_exp(self._data, dim=1, keepdims=True)
         data = self._data - log_sum_exp
+        # the grad is a tensor in the (2+)-D case
         softmax = np.exp(data)
-        grad = np.zeros(shape=(self.shape[0], self.shape[1], self.shape[1]))
-        for i in range(self.shape[0]):
-            grad[i] = np.eye(self.shape[1]) - softmax[i]
+        grad = np.array(  # self._data is (n, m) => grad is (n, m, m)
+            [
+                np.eye(self.shape[1]) - softmax[i][:, np.newaxis]
+                for i in range(self.shape[0])
+            ]
+        )
 
         out = Tensor(data)  # we need to reference this object for the chain_rule
         out._inputs = {self}
 
         def chain_rule():  # assume out.grad is set correctly
-            raise NotImplementedError
+            grad_ = np.array([grad[i] @ out.grad[i] for i in range(grad.shape[0])])
+            self.grad += grad_
 
         out._backward = chain_rule
         return out
@@ -345,17 +348,36 @@ class Tensor:
     ################################## LOSS FUNCTIONS ##################################
     ####################################################################################
 
+    def nll_loss(self, target: list[int], reduction: str = "mean") -> Tensor:
+        # self._data are log-probabilities, i.e., normalized logits, across dim 1.
+        # target is sparsely encoded, so no soft target.
+        # TODO: support observation weights
+        if reduction == "mean":
+            denominator = len(target)
+        elif reduction == "sum":
+            denominator = 1
+        else:
+            raise ValueError('reduction must be either "sum" or "mean".')
+
+        y = target[:, np.newaxis]
+        return (
+            self.take_along_dim(indices=y, dim=1)
+            .__neg__()
+            .sum()
+            .__truediv__(denominator)
+        )
+
     @_single_var
-    def cross_entropy(self, labels: list[int], reduction: str = "mean") -> Tensor:
+    def cross_entropy(self, target: list[int], reduction: str = "mean") -> Tensor:
         # self._data are logits, i.e., unnormalized log-probabilities, across dim 1.
-        # labels are sparsely encoded, so no soft labels.
+        # target is sparsely encoded, so no soft target.
         # TODO: support observation weights
         if reduction not in {"sum", "mean"}:
             raise ValueError('reduction must be either "sum" or "mean".')
 
         # TODO: add answer key explanation
         log_sum_exp = _log_sum_exp(self._data, dim=1, keepdims=True)
-        y = np.array(labels)[:, np.newaxis]
+        y = np.array(target)[:, np.newaxis]
         data = (
             -np.take_along_axis(self._data, indices=y, axis=1).sum() + log_sum_exp.sum()
         )
@@ -367,7 +389,7 @@ class Tensor:
         grad = softmax - is_label
 
         if reduction == "mean":
-            denominator = len(labels)
+            denominator = len(target)
             return data / denominator, grad / denominator
         return data, grad
 

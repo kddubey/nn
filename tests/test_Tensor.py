@@ -301,27 +301,27 @@ def test_T(atol):
     assert np.allclose(W.grad.numpy(), W_.grad, atol)
 
 
-# def test_log_softmax(atol):
-#     # torch.Tensor
-#     X = torch.randn(size=(2, 2), requires_grad=True)
-#     W = torch.randn(size=(2, 3), requires_grad=True)
-#     L = X @ W
-#     W.retain_grad()
-#     X.retain_grad()
-#     L.retain_grad()
-#     l = L.log_softmax(dim=1)
-#     l.sum().backward()
+def test_log_softmax(atol=1e-04):  # seems quite flaky
+    # torch.Tensor
+    X = torch.randn(size=(2, 2), requires_grad=True)
+    W = torch.randn(size=(2, 3), requires_grad=True)
+    L = X @ W
+    W.retain_grad()
+    X.retain_grad()
+    L.retain_grad()
+    l = L.log_softmax(dim=1)
+    l.sum().backward()
 
-#     # nn.Tensor
-#     X_ = nn.Tensor(X.detach().numpy())
-#     W_ = nn.Tensor(W.detach().numpy())
-#     L_ = X_ @ W_
-#     l_ = L_.log_softmax()
-#     l_.sum().backward()
+    # nn.Tensor
+    X_ = nn.Tensor(X.detach().numpy())
+    W_ = nn.Tensor(W.detach().numpy())
+    L_ = X_ @ W_
+    l_ = L_.log_softmax()
+    l_.sum().backward()
 
-#     assert np.allclose(L.grad.numpy(), L_.grad, atol)
-#     assert np.allclose(W.grad.numpy(), W_.grad, atol)
-#     assert np.allclose(X.grad.numpy(), X_.grad, atol)
+    assert np.allclose(L.grad.numpy(), L_.grad, atol)
+    assert np.allclose(W.grad.numpy(), W_.grad, atol)
+    assert np.allclose(X.grad.numpy(), X_.grad, atol)
 
 
 def test_cross_entropy(atol):
