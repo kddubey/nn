@@ -26,7 +26,7 @@ Neural network training and inference using only NumPy, vectorized.
 - For slicing/re-shape operations, just directly code the output of the chain rule
   instead of relying on correct multiplication operations. It's computationally a bit
   better, and feels easier to code and think through: you're just passing on the
-  gradient!
+  gradient to the right place / you're just directing traffic
 - Just copy PyTorch's interface. That makes testing much easier.
 
 </details>

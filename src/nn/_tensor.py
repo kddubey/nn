@@ -228,11 +228,9 @@ class Tensor:
         return out
 
     def mean(self, dim: int | None = None) -> Tensor:
-        sum_ = self.sum(dim=dim)
-        try:
-            return sum_ / self.shape[dim]
-        except IndexError:
-            return sum_
+        if dim is None:
+            return self.sum(dim=dim) / self._data.size
+        return self.sum(dim=dim) / self.shape[dim]
 
     def __getitem__(self, key) -> Tensor:
         # TODO: add answer key explanation

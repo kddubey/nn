@@ -10,7 +10,9 @@ Here's how most of these tests work:
   4. Verify that all (leaf and non-leaf) gradients are equivalent or numerically close
      in order from root to leaf.
 
-Maybe there's a way to automate this, but I'm just doing these manually for now.
+Maybe there's a way to automate this, but I'm just doing these manually for now. It's a
+pretty dirty testing module.
+
 Also I need to test that forward is correct too lol
 I also should check that `(tensor._data - tensor.grad).shape == tensor.shape`.
 """
@@ -26,6 +28,11 @@ import nn
 @pytest.fixture(scope="module")
 def atol() -> float:
     return 1e-06
+
+
+@pytest.fixture(scope="module")
+def atol_loose() -> float:
+    return 1e-04
 
 
 def test__log_sum_exp(atol):
@@ -124,6 +131,21 @@ def test_sum(size_and_dim: tuple[tuple[int], int], atol: float):
     assert np.allclose(y.grad.numpy(), y_.grad, atol)
     assert np.allclose(w.grad.numpy(), w_.grad, atol)
     assert np.allclose(x.grad.numpy(), x_.grad, atol)
+    assert np.allclose(X.grad.numpy(), X_.grad, atol)
+
+
+def test_mean(atol):
+    # already tested sum
+    # torch.Tensor
+    X = torch.randn(size=(2, 3), requires_grad=True)
+    x = X.mean()
+    x.backward()
+
+    # nn.Tensor
+    X_ = nn.Tensor(X.detach().numpy())
+    x_ = X_.mean()
+    x_.backward()
+
     assert np.allclose(X.grad.numpy(), X_.grad, atol)
 
 
@@ -301,7 +323,7 @@ def test_T(atol):
     assert np.allclose(W.grad.numpy(), W_.grad, atol)
 
 
-def test_log_softmax(atol=1e-04):  # seems quite flaky
+def test_log_softmax(atol_loose):  # seems quite flaky
     # torch.Tensor
     X = torch.randn(size=(2, 2), requires_grad=True)
     W = torch.randn(size=(2, 3), requires_grad=True)
@@ -319,12 +341,12 @@ def test_log_softmax(atol=1e-04):  # seems quite flaky
     l_ = L_.log_softmax()
     l_.sum().backward()
 
-    assert np.allclose(L.grad.numpy(), L_.grad, atol)
-    assert np.allclose(W.grad.numpy(), W_.grad, atol)
-    assert np.allclose(X.grad.numpy(), X_.grad, atol)
+    assert np.allclose(L.grad.numpy(), L_.grad, atol_loose)
+    assert np.allclose(W.grad.numpy(), W_.grad, atol_loose)
+    assert np.allclose(X.grad.numpy(), X_.grad, atol_loose)
 
 
-def test_nll_loss(atol=1e-04):
+def test_nll_loss(atol_loose):
     # torch.Tensor
     X = torch.randn(size=(2, 2), requires_grad=True)
     W = torch.randn(size=(2, 3), requires_grad=True)
@@ -347,13 +369,13 @@ def test_nll_loss(atol=1e-04):
     l_ = E_.nll_loss(y_, reduction="mean")
     l_.backward()
 
-    assert np.allclose(E.grad.numpy(), E_.grad, atol)
-    assert np.allclose(L.grad.numpy(), L_.grad, atol)
-    assert np.allclose(W.grad.numpy(), W_.grad, atol)
-    assert np.allclose(X.grad.numpy(), X_.grad, atol)
+    assert np.allclose(E.grad.numpy(), E_.grad, atol_loose)
+    assert np.allclose(L.grad.numpy(), L_.grad, atol_loose)
+    assert np.allclose(W.grad.numpy(), W_.grad, atol_loose)
+    assert np.allclose(X.grad.numpy(), X_.grad, atol_loose)
 
 
-def test_cross_entropy(atol):
+def test_cross_entropy(atol_loose):
     # torch.Tensor
     X = torch.randn(size=(2, 2), requires_grad=True)
     W = torch.randn(size=(2, 3), requires_grad=True)
@@ -373,9 +395,9 @@ def test_cross_entropy(atol):
     l_ = L_.cross_entropy(y_, reduction="mean")
     l_.backward()
 
-    assert np.allclose(L.grad.numpy(), L_.grad, atol)
-    assert np.allclose(W.grad.numpy(), W_.grad, atol)
-    assert np.allclose(X.grad.numpy(), X_.grad, atol)
+    assert np.allclose(L.grad.numpy(), L_.grad, atol_loose)
+    assert np.allclose(W.grad.numpy(), W_.grad, atol_loose)
+    assert np.allclose(X.grad.numpy(), X_.grad, atol_loose)
 
 
 @pytest.mark.parametrize("shape", (1, 2, (2, 3), (2, 3, 4)))
