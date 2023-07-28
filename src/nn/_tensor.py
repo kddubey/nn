@@ -327,19 +327,17 @@ class Tensor:
         data = self._data - log_sum_exp
         # the grad is a tensor in the (2+)-D case
         softmax = np.exp(data)
+        identity = np.eye(self.shape[1])
         grad = np.array(  # self._data is (n, m) => grad is (n, m, m)
-            [
-                np.eye(self.shape[1]) - softmax[i][:, np.newaxis]
-                for i in range(self.shape[0])
-            ]
+            [identity - softmax[i][:, np.newaxis] for i in range(self.shape[0])]
         )
 
         out = Tensor(data)  # we need to reference this object for the chain_rule
         out._inputs = {self}
 
         def chain_rule():  # assume out.grad is set correctly
-            grad_ = np.array([grad[i] @ out.grad[i] for i in range(grad.shape[0])])
-            self.grad += grad_
+            # grad_ = np.array([grad[i] @ out.grad[i] for i in range(grad.shape[0])])
+            self.grad += np.einsum("ijk,ik->ij", grad, out.grad)
 
         out._backward = chain_rule
         return out

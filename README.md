@@ -14,6 +14,8 @@ Neural network training and inference using only NumPy, vectorized.
   to the object now, and update it later when you know the one other thing you need to
   know.
 - Take broadcasting for granted until you can't anymore.
+  - Because of this project, I moved broadcasting up to #1 in my top 5 algorithms I take
+    for granted.
 - If you're having trouble thinking about the gradient of the dot product of
   matrices/vectors, start with a vector-vector dot product, and then matrix-vector, and
   then matrix-matrix. Here's a sort of [answer
