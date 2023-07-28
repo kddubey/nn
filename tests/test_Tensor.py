@@ -1,5 +1,6 @@
 """
-Unit tests `nn.Tensor`.
+Tests `nn.Tensor`. Most of these are integration tests. I've found that unit tests are
+too easy to pass using specious code.
 
 Here's how most of these tests work:
   1. Define a sequence of PyTorch operations which ends with a backward call,
@@ -28,7 +29,6 @@ def atol() -> float:
 
 
 def test__log_sum_exp(atol):
-    # torch.Tensor
     X = torch.randn(size=(4, 3))
     lse_torch = torch.logsumexp(X, dim=1, keepdim=True)
     lse_nn = nn._tensor._log_sum_exp(X.numpy(), dim=1, keepdims=True)
@@ -319,6 +319,35 @@ def test_log_softmax(atol=1e-04):  # seems quite flaky
     l_ = L_.log_softmax()
     l_.sum().backward()
 
+    assert np.allclose(L.grad.numpy(), L_.grad, atol)
+    assert np.allclose(W.grad.numpy(), W_.grad, atol)
+    assert np.allclose(X.grad.numpy(), X_.grad, atol)
+
+
+def test_nll_loss(atol=1e-04):
+    # torch.Tensor
+    X = torch.randn(size=(2, 2), requires_grad=True)
+    W = torch.randn(size=(2, 3), requires_grad=True)
+    y = torch.randint(low=0, high=W.shape[1], size=(X.shape[0],))
+    L = X @ W
+    E = L.log_softmax(dim=1)
+    W.retain_grad()
+    X.retain_grad()
+    L.retain_grad()
+    E.retain_grad()
+    l = torch.nn.functional.nll_loss(E, y, reduction="mean")
+    l.backward()
+
+    # nn.Tensor
+    X_ = nn.Tensor(X.detach().numpy())
+    W_ = nn.Tensor(W.detach().numpy())
+    y_ = y.detach().numpy()
+    L_ = X_ @ W_
+    E_ = L_.log_softmax()
+    l_ = E_.nll_loss(y_, reduction="mean")
+    l_.backward()
+
+    assert np.allclose(E.grad.numpy(), E_.grad, atol)
     assert np.allclose(L.grad.numpy(), L_.grad, atol)
     assert np.allclose(W.grad.numpy(), W_.grad, atol)
     assert np.allclose(X.grad.numpy(), X_.grad, atol)
