@@ -364,7 +364,9 @@ class Tensor:
         )
 
     @_single_var
-    def cross_entropy(self, target: list[int], reduction: str = "mean") -> Tensor:
+    def cross_entropy(
+        self, target: Tensor | list[int], reduction: str = "mean"
+    ) -> Tensor:
         # self._data are logits, i.e., unnormalized log-probabilities, across dim 1.
         # target is sparsely encoded, so no soft target.
         # TODO: support observation weights
@@ -373,6 +375,8 @@ class Tensor:
 
         # TODO: add answer key explanation
         log_sum_exp = _log_sum_exp(self._data, dim=1, keepdims=True)
+        if isinstance(target, self.__class__):
+            target = target._data
         y = np.array(target)[:, np.newaxis]
         data = (
             -np.take_along_axis(self._data, indices=y, axis=1).sum() + log_sum_exp.sum()

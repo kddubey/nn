@@ -1,8 +1,8 @@
 # nn
 Neural network training and inference using only NumPy, vectorized.
   * AKA [micrograd](https://github.com/karpathy/micrograd) but w/ 2-D matrices
-  * AKA a transparent implementation of PyTorch's `Tensor`, assuming broadcasting and
-    dot products are given operations. 
+  * AKA a transparent (but probably not accurate) implementation of PyTorch's `Tensor`,
+    assuming broadcasting and dot products are given operations. 
 
 <details>
 <summary>Tips for others who want to re-implement backprop</summary>
@@ -31,13 +31,54 @@ Neural network training and inference using only NumPy, vectorized.
 
 </details>
 
+## Usage
 
-## todo
+Here's an NN for classification with 1 hidden layer:
 
-- [ ] `requires_grad` / freezing functionality
-- [ ] don't retain grads for non-leaf tensors
-- [ ] arbitrary shapes
-- [ ] basic NN framework
+```python
+import numpy as np
+import nn
+
+# input data parameters
+num_observations = 100
+input_dim = 10
+num_classes = 3
+rng_seed = abs(hash("waddup"))
+
+# simulate input data
+rng = np.random.default_rng(rng_seed)
+y = nn.Tensor(rng.integers(0, num_classes, size=num_observations))
+X = nn.Tensor(rng.normal(size=(num_observations, input_dim)))
+
+# weights
+hidden_size = 20
+W1 = nn.Tensor(rng.normal(size=(input_dim, hidden_size)))
+W2 = nn.Tensor(rng.normal(size=(hidden_size, num_classes)))
+
+# forward pass
+H1 = X @ W1
+H1_relu = H1.relu()
+H2 = H1_relu @ W2
+loss = H2.cross_entropy(y)
+
+# backward pass
+loss.backward()
+```
+
+
+## Installation
+
+```
+python -m pip install git+https://github.com/kddubey/nn.git
+```
+
+
+## Todo
+
+- [ ] actually support tensors
 - [ ] tests
   - [ ] explicitly check that `(tensor._data - tensor.grad).shape == tensor.shape`
   - [ ] clever way to test `nn` code just by typing out `torch` code
+- [ ] basic NN framework
+- [ ] `requires_grad` / freezing functionality
+- [ ] don't retain grads for non-leaf tensors
